@@ -15,7 +15,7 @@
     <ClCompile Include="Hydraulic Erosion.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="glad.c">
+    <ClCompile Include="InitShader.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
   </ItemGroup>
@@ -26,7 +26,10 @@
     <ClInclude Include="Simulator.cuh">
       <Filter>Headers</Filter>
     </ClInclude>
-    <ClInclude Include="Shader.h">
+    <ClInclude Include="InitShader.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderLocs.h">
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>

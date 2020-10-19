@@ -1,7 +1,6 @@
 #ifndef SHADER_H
 #define SHADER_H
 
-#include <glad/glad.h>
 #include <glm/glm.hpp>
 
 #include <string>
@@ -167,7 +166,7 @@ private:
     void checkCompileErrors(GLuint shader, std::string type)
     {
         GLint success;
-        GLchar infoLog[1024];
+        char infoLog[1024];
         if (type != "PROGRAM")
         {
             glGetShaderiv(shader, GL_COMPILE_STATUS, &success);

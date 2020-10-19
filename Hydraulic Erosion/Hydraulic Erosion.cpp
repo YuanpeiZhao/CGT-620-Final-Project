@@ -1,7 +1,7 @@
-#include "Simulator.cuh"
 #include "Renderer.cuh"
-#include "Shader.h"
+#include "Simulator.cuh"
 
+#include <time.h>
 #include <stdio.h>
 #include <string>
 #include <iostream>
@@ -10,44 +10,60 @@ using namespace std;
 
 #define LAYER_NUMBER 2
 
-int voxelX = 1024;
-int voxelY = 1024;
-int voxelZ = 1024;
+unsigned int SCR_WIDTH = 1280;
+unsigned int SCR_HEIGHT = 720;
+
+int voxelX = 128;
+int voxelY = 128;
+int voxelZ = 128;
+
+float delta_t = 0.01f;
+float gravity = 9.8f;
 
 const string matHeightFileNames[LAYER_NUMBER] = { 
 	"rockHeightMap.png",
 	"sandHeightMap.png" };
 
-string vertexShader = "shader.vs";
-string fragmentShader = "shader.fs";
+Simulator sim = Simulator(voxelX, voxelY, voxelZ, LAYER_NUMBER, delta_t, gravity);
+Renderer ren = Renderer(SCR_WIDTH, SCR_HEIGHT);
 
-int main() {
+void Idle()
+{
+	glutPostRedisplay();
 
-	Simulator sim = Simulator(voxelX, voxelY, voxelZ, LAYER_NUMBER);
-	sim.Init(matHeightFileNames);
+	//long t1 = clock();
 
-	//int cnt[3] = { 0 };
-	//for (int i = 0; i < voxelX; i++) {
-	//	for (int j = 0; j < voxelY; j++) {
-	//		for (int k = 0; k < voxelZ; k++) {
-	//			cnt[(int)sim.voxelState[i * voxelY * voxelZ + j * voxelZ + k]-1] ++;
-	//		}
-	//		
-	//	}
-	//	
-	//}
-	//cout << cnt[0] << ' ' << cnt[1] << ' ' << cnt[2] << endl;
+	sim.SimulateShallowWater();
+	ren.Render(voxelX, voxelY, voxelZ, sim.d_voxelState);
 
-	Renderer ren = Renderer();
-	ren.Init(sim.voxelState, voxelX, voxelY, voxelZ);
+	//long t2 = clock();
 
-	Shader shader = Shader(vertexShader.c_str(), fragmentShader.c_str());
+	//cout << 1000 / (t2 - t1 + 1) << endl;
+}
 
-	while (!glfwWindowShouldClose(ren.window)) {
-		ren.Render(shader);
+void Display(void)
+{
+}
+
+int main(int argc, char** argv) {
+
+	glutInitWindowSize(SCR_WIDTH, SCR_HEIGHT);
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+	glutCreateWindow("CUDA OpenGL interoperability");
+	GLenum err = glewInit();
+	if (GLEW_OK != err)
+	{
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+
 	}
-	
-	ren.End();
+
+	sim.Init(matHeightFileNames);
+	ren.Init(voxelX, voxelY, voxelZ);	
+
+	glutDisplayFunc(Display);
+	glutIdleFunc(Idle);
+	glutMainLoop();
 
 	return 0;
 }

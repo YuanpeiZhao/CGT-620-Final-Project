@@ -1,14 +1,14 @@
-#version 330 core
+#version 460 core
 layout (location = 0) in vec3 aPos;
 
-uniform mat4 M;
-uniform mat4 V;
-uniform mat4 P;
+layout(location = 0) uniform mat4 M;
+layout(location = 1) uniform mat4 V;
+layout(location = 2) uniform mat4 P;
 
-out vec3 texCoord;
+out vec3 vPos;
 
 void main()
 {
-    texCoord = (aPos+vec3(1.0f)) / 2.0f;
+    vPos = (M * vec4(aPos, 1.0f)).zxy;
     gl_Position = P * V * M * vec4(aPos, 1.0);
 }
