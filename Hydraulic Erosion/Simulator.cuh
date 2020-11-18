@@ -20,28 +20,62 @@ struct Material {
 	float color[4];
 };
 
+struct Setting {
+
+	int voxelX;
+	int voxelY;
+	int voxelZ;
+	int layerNum;
+	int scene;
+
+	int erosionFreqInFrame;
+
+	double delta_t;
+	double g;
+	float cMaxRate;
+	float erosionRate;
+	float pipeLen;
+	float matTransRate;
+
+	bool erosion;
+	bool deposition;
+	bool transportation;
+
+	float camHeight;
+	float camAngle;
+	float camFOV;
+};
+
 class Simulator {
 
 private:
-	float* d_heightState;		// 2*voxelX * voxelY, heightState[x][y][0] for material height, heightState[x][y][0] for water height
-	float* d_flow;
+	double* d_heightState;		// 2*voxelX * voxelY, heightState[x][y][0] for material height, heightState[x][y][1] for water height
+	double* d_flow;
+	double* d_m;
+	double* d_mWater;
+	double* d_mDensity;
 
-	float delta_t;
-	float g;
-
-	int voxelX, voxelY, voxelZ;
-	int matLayerNum;
+	int frameCnt;
+	double erosionRate;
 	int imgWidth, imgHeight;
-	
+
 	unsigned char* LoadImage(const string fileName);
-	void InitWaterFixed(unsigned char* voxelState, float* heightState);
+	void InitWater(unsigned char* voxelState, double* heightState);
 
 public:
 	unsigned char* d_voxelState;
+	//bool erosion = false;
+	//bool deposition = false;
+	//bool transportation = false;
+	Setting preset;
 
-	Simulator(int vX, int vY, int vZ, int layerNum, float delta_t, float g);
-	int Init(const string fileNames[]);
+	Simulator();
+	int Init(const string fileNames[], Setting set);
 	int SimulateShallowWater();
+	int Replay(const string fileNames[], Setting set);
+	int Debug();
+	void UpdateSetting(Setting set);
+	int AddWater();
 };
 
 #endif // !SIMULATOR_CUH

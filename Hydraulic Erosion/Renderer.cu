@@ -80,7 +80,7 @@ __device__ float3 RenderMat(float3 color, float3 pos, float3 rayDir, int voxelX,
 	return add(make_float3(La.x*color.x, La.y * color.y, La.z * color.z), make_float3(Ld.x * color.x * diff, Ld.y * color.y * diff, Ld.z * color.z * diff));
 }
 
-__global__ void rayMarching(float4* pixelPtr, unsigned char* voxel, int width, int height, int voxelX, int voxelY, int voxelZ) {
+__global__ void rayMarching(float4* pixelPtr, unsigned char* voxel, int width, int height, int voxelX, int voxelY, int voxelZ, bool showWater) {
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -97,6 +97,9 @@ __global__ void rayMarching(float4* pixelPtr, unsigned char* voxel, int width, i
     float3 rayStop = make_float3(rayStop4.x, rayStop4.y, rayStop4.z);
 
     int MaxSamples = 1024; //max number of steps along ray
+    float waterSurfRate = 0.6f;
+    float waterStepRate = 0.0f;
+    float matRate = 0.4f;
 
     float travel = distance(rayStart, rayStop);
 
@@ -110,6 +113,11 @@ __global__ void rayMarching(float4* pixelPtr, unsigned char* voxel, int width, i
 	float stepSize = travel/MaxSamples;	//initial raymarch step size
 	float3 pos = rayStart;				//position along the ray
 	float3 step = time(rayDir, stepSize);		//displacement vector along ray
+
+    float3 waterSurf = make_float3(0.2f, 0.3f, 0.4f);
+    float3 result = make_float3(0.2f, 0.3f, 0.4f);
+    float3 waterColor = make_float3(0.2f, 0.5f, 0.5f);
+    bool hitWater = false;
 	
 	for (int i=0; i < MaxSamples && travel > 0.0001; ++i, pos = add(pos, step), travel -= stepSize)
 	{
@@ -120,28 +128,51 @@ __global__ void rayMarching(float4* pixelPtr, unsigned char* voxel, int width, i
 
         unsigned char t = voxel[Z * voxelY * voxelZ + Y * voxelZ + X];
 
-        //printf("%d %d %d: %d\n", x, y, z, t);
-
         if (t == 1) {
-            float3 result = RenderMat(make_float3(0.3f, 0.7f, 0.7f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
+            if(!showWater) continue;
+
+            if (hitWater == false) {
+                hitWater = true;
+                waterSurf = RenderMat(make_float3(0.2f, 0.5f, 0.5f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
+
+            }
+            else {
+                waterStepRate += 1.0f / MaxSamples;
+            }
+            /*float3 result = RenderMat(make_float3(0.2f, 0.5f, 0.5f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
             pixelPtr[x + y * width] = make_float4(result.x ,result.y, result.z, 1.0f);
-            return;
+            return;*/
         }
 
         else if (t == 2) {
-            float3 result = RenderMat(make_float3(0.5f, 0.5f, 0.5f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
-            pixelPtr[x + y * width] = make_float4(result.x, result.y, result.z, 1.0f);
-            return;
+            result = RenderMat(make_float3(0.5f, 0.5f, 0.5f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
+            if (hitWater == false) waterSurf = result; 
+            break;
+            /*pixelPtr[x + y * width] = make_float4(result.x, result.y, result.z, 1.0f);
+            return;*/
         }
 
         else if (t == 3) {
-            float3 result = RenderMat(make_float3(0.7f, 0.7f, 0.5f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
-            pixelPtr[x + y * width] = make_float4(result.x, result.y, result.z, 1.0f);
-            return;
+            result = RenderMat(make_float3(0.5f, 0.5f, 0.2f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
+            if (hitWater == false) waterSurf = result;
+            break;
+            /*pixelPtr[x + y * width] = make_float4(result.x, result.y, result.z, 1.0f);
+            return;*/
+        }
+
+        else if (t == 4) {
+            result = RenderMat(make_float3(0.5f, 0.2f, 0.2f), pos, rayDir, voxelX, voxelY, voxelZ, voxel);
+            if (hitWater == false) waterSurf = result;
+            break;
+            /*pixelPtr[x + y * width] = make_float4(result.x, result.y, result.z, 1.0f);
+            return;*/
         }
 	}
+    float xx = (result.x * matRate + waterSurf.x * waterSurfRate) * (1.0f - waterStepRate) + waterColor.x * waterStepRate;
+    float yy = (result.y * matRate + waterSurf.y * waterSurfRate) * (1.0f - waterStepRate) + waterColor.y * waterStepRate;
+    float zz = (result.z * matRate + waterSurf.z * waterSurfRate) * (1.0f - waterStepRate) + waterColor.z * waterStepRate;
 	//If the ray never intersects the scene then output clear color
-    pixelPtr[x + y * width] = make_float4(0.2f, 0.3f, 0.4f, 1.0f);
+    pixelPtr[x + y * width] = make_float4(xx, yy, zz, 1.0f);
 	return;
 }
 
@@ -257,8 +288,10 @@ int Renderer::Init(int x, int y, int z) {
     return 0;
 }
 
-void Renderer::Render(int voxelX, int voxelY, int voxelZ, unsigned char* voxel)
+void Renderer::Render(int voxelX, int voxelY, int voxelZ, float height, float angle, float FOV, unsigned char* voxel)
 {
+    glEnable(GL_CULL_FACE);
+
     const int w = glutGet(GLUT_WINDOW_WIDTH);
     const int h = glutGet(GLUT_WINDOW_HEIGHT);
     const float aspect_ratio = float(w) / float(h);
@@ -267,8 +300,8 @@ void Renderer::Render(int voxelX, int voxelY, int voxelZ, unsigned char* voxel)
     glUseProgram(shader_program);
 
     glm::mat4 M = glm::mat4(1.0f);
-    glm::mat4 V = glm::lookAt(glm::vec3(3.0f, 3.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::rotate(0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    glm::mat4 P = glm::perspective(glm::radians(45.0f), aspect_ratio, 0.1f, 100.0f);
+    glm::mat4 V = glm::lookAt(glm::vec3(3.0f, 3.0f, height), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::rotate(angle, glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 P = glm::perspective(FOV, aspect_ratio, 0.1f, 100.0f);
 
     glUniformMatrix4fv(UniformLoc::M, 1, false, glm::value_ptr(M));
     glUniformMatrix4fv(UniformLoc::V, 1, false, glm::value_ptr(V));
@@ -346,7 +379,7 @@ void Renderer::Render(int voxelX, int voxelY, int voxelZ, unsigned char* voxel)
     error = cudaGraphicsResourceGetMappedPointer((void**)&pixelPtr, &size, cudaResourcePBO);
     if (error != cudaSuccess) printf("Something went wrong: %s\n", cudaGetErrorString(error));
 
-    rayMarching << <dimGrid, dimBlock >> > (pixelPtr, voxel, fbo_texture_width, fbo_texture_height, voxelX, voxelY, voxelZ);
+    rayMarching << <dimGrid, dimBlock >> > (pixelPtr, voxel, fbo_texture_width, fbo_texture_height, voxelX, voxelY, voxelZ, showWater);
 
     error = cudaGraphicsUnmapResources(1, &cudaResourcePBO, 0);
     if (error != cudaSuccess) printf("Something went wrong: %s\n", cudaGetErrorString(error));
@@ -358,8 +391,13 @@ void Renderer::Render(int voxelX, int voxelY, int voxelZ, unsigned char* voxel)
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Do not render the next pass to FBO.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
     glDrawPixels(fbo_texture_width, fbo_texture_height, GL_RGBA, GL_FLOAT, 0);
-    glutSwapBuffers();
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    //glutSwapBuffers();
+
+    //glUseProgram(shader_program);
+    //glDisable(GL_CULL_FACE);
 
     //// Pass 3
 

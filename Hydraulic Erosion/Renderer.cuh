@@ -53,9 +53,11 @@ private:
 
 public:
 	
+	bool showWater = true;
+
 	Renderer(unsigned int w, unsigned int h);
 	int Init(int x, int y, int z);
-	void Render(int voxelX, int voxelY, int voxelZ, unsigned char* voxel);
+	void Render(int voxelX, int voxelY, int voxelZ, float height, float angle, float FOV, unsigned char* voxel);
 	void End();
 };
 
